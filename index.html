@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cofre de Segredos</title>
+<style>
+  :root { --fundo:#eef2f6; --tinta:#14213d; --azul:#2a6f97; --alerta:#c1121f; --caixa:#fff; --linha:#c9d3de; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fundo:#0f1824; --tinta:#e6edf5; --azul:#6ab0d8; --alerta:#ff7b84; --caixa:#182536; --linha:#2c3e54; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font:17px/1.6 Georgia, serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 2.5rem 1.2rem 4rem; }
+  h1 { font-size: 2.4rem; line-height: 1.15; margin: 0 0 .5rem; }
+  h2 { font-size: 1.4rem; margin: 0 0 .3rem; }
+  p.sub { margin: 0 0 2rem; max-width: 60ch; }
+  section { background: var(--caixa); border: 1px solid var(--linha); border-left: 5px solid var(--azul); border-radius: 4px; padding: 1.3rem; margin-bottom: 1.5rem; }
+  section.perigo { border-left-color: var(--alerta); }
+  label { display:block; font: 600 .9rem system-ui, sans-serif; margin: .8rem 0 .25rem; }
+  input, select, textarea { width:100%; padding:.6rem; font: 1rem monospace; color:var(--tinta); background:var(--fundo); border:1px solid var(--linha); border-radius:3px; }
+  button { margin: .8rem .5rem 0 0; padding:.6rem 1rem; font: 600 .95rem system-ui, sans-serif; background:var(--azul); color:#fff; border:0; border-radius:3px; cursor:pointer; }
+  button.sec { background:transparent; color:var(--azul); border:1px solid var(--azul); }
+  .saida { margin-top: 1rem; padding: .8rem; background: var(--fundo); border-radius: 3px; font: .9rem monospace; word-break: break-all; white-space: pre-wrap; min-height: 1rem; }
+  .erro { color: var(--alerta); font-family: system-ui, sans-serif; }
+  .medidor { height: 8px; background: var(--linha); border-radius: 4px; margin-top: .5rem; overflow: hidden; }
+  .medidor div { height: 100%; width: 0; transition: width .2s; }
+  ul { padding-left: 1.2rem; } li { margin-bottom: .4rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cofre de Segredos</h1>
+  <p class="sub">Quatro experimentos em Python: esconder mensagens, transformar senhas em hash, quebrar senhas fracas por força bruta e aprender a se proteger.</p>
+
+  <section>
+    <h2>Cifra por substituição</h2>
+    <p>César desloca N posições; a substituição simples usa um alfabeto embaralhado.</p>
+    <label for="metodo">Método</label>
+    <select id="metodo"><option value="cesar">César (deslocamento)</option><option value="subst">Substituição simples (chave de 26 letras)</option></select>
+    <label for="chave" id="rotuloChave">Deslocamento</label>
+    <input id="chave" value="3">
+    <label for="texto">Mensagem</label>
+    <textarea id="texto" rows="3">Encontro às 18h na praça</textarea>
+    <button onclick="cifrar('codificar')">Codificar</button>
+    <button class="sec" onclick="cifrar('decodificar')">Decodificar</button>
+    <div class="saida" id="saidaCifra"></div>
+  </section>
+
+  <section>
+    <h2>Hash: a impressão digital da senha</h2>
+    <p>O mesmo texto sempre gera o mesmo hash. Com sal, cada hash sai diferente.</p>
+    <label for="senhaHash">Senha</label>
+    <input id="senhaHash" value="gato123">
+    <button onclick="gerarHash()">Gerar hash</button>
+    <div class="saida" id="saidaHash"></div>
+  </section>
+
+  <section class="perigo">
+    <h2>Simulador de força bruta</h2>
+    <p>O programa guarda só o hash da senha de teste e tenta todas as combinações até achar. Use até 4 caracteres.</p>
+    <label for="senhaBruta">Senha de teste</label>
+    <input id="senhaBruta" value="4821" maxlength="4">
+    <label for="conjunto">Caracteres possíveis</label>
+    <select id="conjunto"><option value="digitos">Só números</option><option value="minusculas">Letras minúsculas</option><option value="minusculas_digitos">Minúsculas + números</option></select>
+    <button onclick="atacar()">Atacar</button>
+    <div class="saida" id="saidaBruta"></div>
+  </section>
+
+  <section>
+    <h2>Boas práticas</h2>
+    <label for="senhaForca">Teste a força de uma senha</label>
+    <input id="senhaForca" oninput="avaliar()" autocomplete="off">
+    <div class="medidor"><div id="barra"></div></div>
+    <div class="saida" id="saidaForca">Digite acima pra ver as dicas.</div>
+    <ul>
+      <li>Nunca guarde senha em texto puro: guarde hash com sal (PBKDF2, bcrypt ou argon2).</li>
+      <li>Senha longa vence senha "complicada": 4 palavras aleatórias é melhor que P@ssw0rd!</li>
+      <li>Uma senha diferente por site, num gerenciador de senhas.</li>
+      <li>Ative verificação em duas etapas onde der.</li>
+      <li>César e substituição servem pra aprender, não pra proteger nada de verdade.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+async function chamar(rota, dados) {
+  const r = await fetch(rota, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dados) });
+  return r.json();
+}
+function mostrar(el, d, formatar) {
+  el.innerHTML = d.erro ? `<span class="erro">${d.erro}</span>` : formatar(d);
+}
+const esc = t => t.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+$("metodo").onchange = () => {
+  const cesar = $("metodo").value === "cesar";
+  $("rotuloChave").textContent = cesar ? "Deslocamento" : "Chave (26 letras embaralhadas)";
+  $("chave").value = cesar ? "3" : "qwertyuiopasdfghjklzxcvbnm";
+};
+
+async function cifrar(acao) {
+  const d = await chamar("/api/cifrar", { metodo: $("metodo").value, chave: $("chave").value, texto: $("texto").value, acao });
+  mostrar($("saidaCifra"), d, d => esc(d.saida));
+}
+
+async function gerarHash() {
+  const d = await chamar("/api/hash", { senha: $("senhaHash").value });
+  mostrar($("saidaHash"), d, d =>
+    `SHA-256 (1ª vez): ${d.sha256}\nSHA-256 (2ª vez): ${d.sha256_de_novo}\n→ idênticos. Quem tiver uma tabela de hashes conhecidos descobre a senha.\n\n` +
+    d.com_sal.map((x, i) => `Com sal #${i + 1}\nsal:  ${x.sal}\nhash: ${x.hash}`).join("\n\n") +
+    `\n→ mesma senha, hashes diferentes.`);
+}
+
+async function atacar() {
+  $("saidaBruta").textContent = "Atacando...";
+  const d = await chamar("/api/forca-bruta", { senha: $("senhaBruta").value, conjunto: $("conjunto").value });
+  mostrar($("saidaBruta"), d, d => {
+    const topo = d.achou ? `Senha encontrada: ${esc(d.senha)}` : "Não achou dentro do limite de tentativas.";
+    const est = Object.entries(d.estimativas).map(([n, t]) => `${n} caracteres: ${t}`).join("\n");
+    return `${topo}\n${d.tentativas.toLocaleString("pt-BR")} tentativas em ${d.segundos}s (${d.tentativas_por_segundo.toLocaleString("pt-BR")}/s)\n\nNesse mesmo ritmo, uma senha com esses caracteres levaria:\n${est}`;
+  });
+}
+
+async function avaliar() {
+  const d = await chamar("/api/avaliar", { senha: $("senhaForca").value });
+  const cores = ["#c1121f", "#c1121f", "#e07a1f", "#d4a017", "#74a64a", "#2d6a4f"];
+  $("barra").style.width = d.nota * 20 + "%";
+  $("barra").style.background = cores[d.nota];
+  $("saidaForca").innerHTML = d.problemas.length ? d.problemas.join("<br>") : "Boa senha! 💪";
+}
+</script>
+</body>
+</html>
